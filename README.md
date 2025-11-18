@@ -4,15 +4,16 @@
 
 #### **修訂歷史**
 
-* **v1.0 (2025-01-15)**: 初始版本，建立完整的系統使用指南
+* **v1.1 (2025-11-18)**: 大改版，更符合文檔需求而非使用手冊
+* **v1.0 (2025-11-15)**: 初始版本，建立完整的系統使用指南
 
 ---
 
 # **日誌系統使用指南**
 
-**版本：1.0 (2025-11-15)**
+**版本：1.1 (2025-11-18)**
 
-**最後更新：2025-01-15**
+**最後更新：2025-11-18**
 
 ### 目錄
 
@@ -133,45 +134,25 @@
 #### 5.1. config_api.py 配置項目
 
 ```python
-# Telegram 配置
-DEV_TG_CHATID = "-5063542084"           # 開發者群組 ID
-DEV_TG_TOKEN = "your_bot_token"         # 開發者 Bot Token
-CUSTOMER_TG_CHATID = "7150365066"       # 客戶 Chat ID
-CUSTOMER_TG_TOKEN = "your_bot_token"    # 客戶 Bot Token
+# RabbitMQ的設定
+MALLMQUSER = 'admin' 
+MALLMQPASS = 'b8be25bb' #aaPanel=>app store=>RabbitMQ(如果沒有就去下載)欄位的setting=>Admin auth 區塊查看
+MALLMQHOST = 'david5672.stkcpu.cc' #此處應更換成'stktestssh.stkcpu.cc'
+MALLMQPORT = 5672 #應更換成你在OP上被發配的RabbitMQ的PORT
+APIMQPROTO = 'https'
+APIMQHOST = 'david15672.stkcpu.cc' #更改英文名,數字無須更改.ex 'sean15672.stkcpu.cc'
+APIMQPORT = 443
+REPORT_PATH = 'C:/Users/stk-3707/Desktop/' # windows 用
+# REPORT_PATH  = '/tmp/' # liunx 用
 
-# 網域名稱 (用於區分不同服務)
-DOMAIN_NAME = "example.com"
-
-# LogBeacon API
-LOGBEACON_URL = "https://logbeacon.shutokou.cc/log/"
-
-# RabbitMQ 配置
+# 日誌系統 MQ 配置
 LOG_MQ_CONFIG = {
-    'USER': 'admin',
-    'PASS': 'password',
-    'HOST': 'rabbitmq.example.com',
-    'PORT': 5680,
+    'USER': 'admin',  
+    'PASS': 'b6fb1153', #同MALLMQPASS
+    'HOST': 'stktestssh.stkcpu.cc',  
+    'PORT': 5673, #應更換成你在OP上被發配的RabbitMQ的PORT
 }
-```
-
-#### 5.2. LogSystemConfig 配置 (logsys_mq.py)
-
-```python
-class LogSystemConfig:
-    # 發送規則
-    NEED_LOGBEACON = [1, 9, 11, 91]      # 需要發送到 LogBeacon
-    NEED_TG = [9, 91]                     # 需要發送到開發者 TG
-    NEED_CUSTOMER_TG = [11, 91]           # 需要發送到客戶 TG
-    ONLY_PRINT = [0, 99]                  # 只本地輸出
-
-    # 訊息限制
-    MAX_EXTRA_INFO_LENGTH = 3000          # 附加訊息最大長度
-    MAX_LOGBEACON_RESPONSE_LENGTH = 500   # LogBeacon 響應截斷長度
-
-    # 重試設定
-    LOGBEACON_RETRY_COUNT = 3             # LogBeacon 重試次數
-    TELEGRAM_RETRY_COUNT = 2              # Telegram 重試次數
-    RETRY_DELAY = 0.5                     # 重試間隔(秒)
+}
 ```
 
 ### 6. 使用方法
@@ -200,88 +181,6 @@ await logsys(91, "service_error", "服務暫時無法使用", "資料庫連線�
 await logsys(99, "api_monitor", f"API 響應時間: {response_time}ms", "")
 ```
 
-#### 6.2. 帶 Hash 值的使用 (用於追蹤)
-
-```python
-import hashlib
-import json
-
-# 生成 hash 用於追蹤特定事件
-event_data = {"user_id": user_id, "action": "payment"}
-hash_value = hashlib.md5(json.dumps(event_data).encode()).hexdigest()
-
-await logsys(
-    level=9,
-    def_name="process_payment",
-    message="支付處理失敗",
-    extra_info=f"錯誤: {error_msg}",
-    hash_value=hash_value
-)
-```
-
-#### 6.3. 在 FastAPI 中使用
-
-```python
-from fastapi import FastAPI, HTTPException
-from logsys_mq import init_logsys, logsys
-
-app = FastAPI()
-
-@app.on_event("startup")
-async def startup_event():
-    # 初始化日誌系統
-    await init_logsys(program_name="my_api")
-    await logsys(1, "startup", "應用程式啟動成功", "")
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    # 優雅關閉
-    from logsys_mq import _default_log_system
-    if _default_log_system:
-        await _default_log_system.close()
-    await logsys(1, "shutdown", "應用程式已關閉", "")
-
-@app.post("/api/users")
-async def create_user(user_data: dict):
-    try:
-        # 處理邏輯
-        await logsys(1, "create_user", "用戶創建成功", f"user_id: {user_id}")
-        return {"status": "success"}
-    except Exception as e:
-        await logsys(9, "create_user", "用戶創建失敗", str(e))
-        raise HTTPException(status_code=500, detail="創建失敗")
-```
-
-#### 6.4. 自訂 LogSystem 實例
-
-```python
-from logsys_mq import LogSystem
-import aio_pika
-
-# 創建自訂實例
-async def create_custom_log_system():
-    # 建立 MQ 連線
-    rabbitmq_url = "amqp://user:pass@host:port/"
-    mq_conn = await aio_pika.connect_robust(
-        rabbitmq_url,
-        client_properties={"heartbeat": 600}
-    )
-
-    # 創建 LogSystem 實例
-    log_sys = LogSystem(
-        program_name="custom_program",
-        domain_name="custom.domain.com",
-        mq_conn=mq_conn,
-        dev_tg_token="your_token",
-        dev_tg_chatid="your_chat_id"
-    )
-
-    # 使用
-    await log_sys.log(1, "test", "測試訊息", "額外資訊")
-
-    # 記得關閉
-    await log_sys.close()
-```
 
 ### 7. Worker 程序
 
