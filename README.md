@@ -10,7 +10,7 @@
 
 # **日誌系統使用指南**
 
-**版本：1.0 (2025-01-15)**
+**版本：1.0 (2025-11-15)**
 
 **最後更新：2025-01-15**
 
@@ -18,7 +18,6 @@
 
 1. [系統概述](#系統概述)
 2. [系統架構](#系統架構)
-3. [快速開始](#快速開始)
 4. [日誌級別說明](#日誌級別說明)
 5. [配置說明](#配置說明)
 6. [使用方法](#使用方法)
@@ -54,10 +53,10 @@
 │      LogSystem              │
 │  (logsys_mq.py)             │
 ├─────────────────────────────┤
-│ • 本地日誌輸出 (彩色)       │
-│ • 訊息格式化與驗證          │
-│ • MQ 連線管理與重連         │
-│ • 備援模式自動切換          │
+│ • 本地日誌輸出 (彩色)        │
+│ • 訊息格式化與驗證           │
+│ • MQ 連線管理與重連          │
+│ • 備援模式自動切換           │
 └────┬────────────────────┬───┘
      │                    │
      │ MQ 可用            │ MQ 不可用
@@ -73,13 +72,15 @@
 │ LB   │ │   TG   │ │ LB │ │ TG │
 │Worker│ │ Worker │ │API │ │API │
 └──┬───┘ └───┬────┘ └─┬──┘ └─┬──┘
-   │         │         │      │
-   ▼         ▼         ▼      ▼
-┌──────────┐ ┌────────────────┐
-│LogBeacon │ │   Telegram     │
-│   API    │ │ (開發者/客戶)  │
-└──────────┘ └────────────────┘
+   │         │        │      │
+   ▼         ▼        ▼      ▼
+┌─────────────┐  ┌────────────────┐
+│  LogBeacon  │  │   Telegram     │
+│     API     │  │ (開發者/客戶)   │
+└─────────────┘  └────────────────┘
 ```
+流程說明
+
 
 #### 2.1. 核心組件
 
@@ -104,49 +105,7 @@
     * Telegram 配置
     * LogBeacon URL
 
-### 3. 快速開始
 
-#### 3.1. 在應用程式中初始化
-
-```python
-from logsys_mq import init_logsys, logsys
-import asyncio
-
-# 在應用程式啟動時初始化
-async def startup():
-    # 初始化日誌系統
-    log_system = await init_logsys(program_name="your_program_name")
-    print("日誌系統初始化完成")
-
-# FastAPI 範例
-from fastapi import FastAPI
-
-app = FastAPI()
-
-@app.on_event("startup")
-async def app_startup():
-    await startup()
-```
-
-#### 3.2. 使用日誌函數
-
-```python
-# 基本使用
-await logsys(1, "function_name", "操作成功", "額外資訊")
-
-# 帶 hash 值 (用於追蹤)
-await logsys(9, "function_name", "發生錯誤", str(error), hash_value="abc123")
-```
-
-#### 3.3. 啟動 Worker 程序
-
-```bash
-# 啟動 LogBeacon Worker
-python send_logbeacon.py
-
-# 啟動 Telegram Worker
-python send_tg.py
-```
 
 ### 4. 日誌級別說明
 
