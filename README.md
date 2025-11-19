@@ -361,10 +361,6 @@ await log_system.close()
 2. Worker 程序正在運行
 3. RabbitMQ 佇列有訊息流動
 
-```bash
-# 檢查佇列狀態
-rabbitmqctl list_queues
-```
 
 #### Q2: MQ 斷線後日誌會丟失嗎?
 
