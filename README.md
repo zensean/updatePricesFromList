@@ -4,16 +4,16 @@
 
 #### **修訂歷史**
 
-* **v1.1 (2025-11-18)**: 大改版，更符合文檔需求而非使用手冊
+* **v1.1 (2025-11-19)**: 大改版，更符合文檔需求而非使用手冊
 * **v1.0 (2025-11-15)**: 初始版本，建立完整的系統使用指南
 
 ---
 
 # **日誌系統使用指南**
 
-**版本：1.1 (2025-11-18)**
+**版本：1.1 (2025-11-19)**
 
-**最後更新：2025-11-18**
+**最後更新：2025-11-19**
 
 ### 目錄
 
@@ -51,7 +51,7 @@
               │ 呼叫 logsys()
               ▼
      ┌─────────────────────────────┐
-     │      LogSystem              │
+     │      LogSystem    2.1.1     │
      │  (logsys_mq.py)             │
      ├─────────────────────────────┤
      │ • 本地日誌輸出 (彩色)        │
@@ -71,9 +71,9 @@
    ▼            ▼          ▼       ▼
 ┌─────────┐ ┌────────┐   ┌────┐ ┌────┐
 │LB-Worker│ │   TG   │   │ LB │ │ TG │
-│(send_   │ │ Worker │   │API │ │API │
-│logbeacon│ │(send_tg│   │    │ │    │
-│.py)     │ │.py)    │   │    │ │    │   
+│         │ │        │   │API │ │API │
+│  2.1.2  │ │  2.1.3 │   │    │ │    │
+│         │ |        │   │    │ │    │   
 └────┬────┘ └───┬────┘   └─┬──┘ └─┬──┘
      │          │          │      │
      ▼          ▼          ▼      ▼
@@ -107,7 +107,7 @@
 
 
 
-### 4. 日誌級別說明
+### 3. 日誌級別說明
 
 系統提供六個日誌級別，各級別的行為如下：
 
@@ -120,7 +120,7 @@
 | 91 | Error_CTG | 客戶錯誤通知 | ✓ (紅色) | ✓ | ✓ | ✓ |
 | 99 | Monitor | 監控訊息 | ✓ (綠底) | ✗ | ✗ | ✗ |
 
-#### 4.1. 級別選擇建議
+#### 3.1. 級別選擇建議
 
 * **Level 0 (Debug)**: 開發調試用，僅本地輸出
 * **Level 1 (Info)**: 重要操作記錄，會送到 LogBeacon
@@ -129,9 +129,19 @@
 * **Level 91 (Error_CTG)**: 需要通知客戶的錯誤訊息
 * **Level 99 (Monitor)**: 性能監控訊息，僅本地輸出
 
-### 5. 配置說明
+### 4. config_api.py配置項目說明
 
-#### 5.1. config_api.py 配置項目
+關於配置項目，大部分會需要的資訊都可以去STK 測試環境中尋找，裡面會提供第一次運行測試時，你所需要的包括但不限於帳號、密碼、Host、Port等資訊。
+
+#### 4.1. 系統切換開關 (最重要的配置)
+該配置在config_api.py程式碼中最下方的位置，負責切換是否需使用新版日誌系統
+
+```python
+# 日誌系統使用版本：True 使用新版本，False 使用舊有程式內建 log_worker 函數，此為預防前期新系統有異常時可以快速切換
+USE_NEW_LOGSYS = True
+```
+
+#### 4.2. RabbitMQ的設定
 
 ```python
 # RabbitMQ的設定
@@ -151,13 +161,35 @@ LOG_MQ_CONFIG = {
     'PASS': 'b6fb1153', #同MALLMQPASS
     'HOST': 'stktestssh.stkcpu.cc',  
     'PORT': 5673, #應更換成你在OP上被發配的RabbitMQ的PORT
-}
-}
 ```
 
-### 6. 使用方法
+#### 4.3. MySQL 連接池的設定
 
-#### 6.1. 基本使用範例
+```python
+# MySQL 連接池
+MYSQL_MAXSIZE = 200  # 最大
+MYSQL_MINSIZE = 40   # 最小
+LOGBEACON_URL = "https://logbeacon.shutokou.cc/log/"
+MONITOR_API_TIME = True
+MONITOR_API_TIME_THRESHOLD = 2
+MYSQL_DB = 'stktest' #此處須注意,你的mySQL實際上有沒有該名稱的DB不然會跳錯
+MYSQL_HOST = 'stktestssh.stkcpu.cc' #使用外網連接
+MYSQL_PASSWD = '!ZzZ3345678' #公司預設密碼
+MYSQL_PORT = 13312 #注意需更改成你的muSQL個人外部連接端口
+MYSQL_USER = 'stktest' #你登入mySQL時用的帳號
+```
+#### 4.4. redis的設定
+
+```python
+# redis的設定
+REDIS_HOST = "stktestssh.stkcpu.cc" #使用外網連接
+REDIS_PASSWD = "!ZzZ3345678" #公司預設密碼
+REDIS_PORT = 16379 #注意更改成你的redis個人外部連接端口
+```
+
+### 5. 使用方法
+
+#### 5.1. 基本使用範例
 
 ```python
 from logsys_mq import logsys
@@ -182,9 +214,9 @@ await logsys(99, "api_monitor", f"API 響應時間: {response_time}ms", "")
 ```
 
 
-### 7. Worker 程序
+### 6. Worker 程序
 
-#### 7.1. LogBeacon Worker (send_logbeacon.py)
+#### 6.1. LogBeacon Worker (send_logbeacon.py)
 
 **功能:**
 
@@ -212,7 +244,7 @@ python send_logbeacon.py
 ❌ 發送失敗 [LogBeacon-Error] function_name - 操作失敗 - 附加信息: 錯誤訊息
 ```
 
-#### 7.2. Telegram Worker (send_tg.py)
+#### 6.2. Telegram Worker (send_tg.py)
 
 **功能:**
 
@@ -234,16 +266,7 @@ python send_tg.py
 ✅ 發送成功 [TG-customer] 系統通知 - example.com: 訂單已出貨
 ```
 
-#### 7.3. Worker 配置
-
-```python
-WORKER_CONFIG = {
-    'MAX_RETRIES': 3,        # 最大重試次數
-    'RETRY_DELAY': 30,       # 重試延遲(秒)
-}
-```
-
-#### 7.4. 健康檢查
+#### 6.3. 健康檢查
 
 兩個 Worker 都有內建健康檢查機制：
 
@@ -256,9 +279,9 @@ WORKER_CONFIG = {
 [處理中] 待處理訊息 (LogBeacon: 15)
 ```
 
-### 8. 備援機制
+### 7. 備援機制
 
-#### 8.1. 自動備援流程
+#### 7.1. 自動備援流程
 
 當 RabbitMQ 無法連線時，系統會自動切換到備援模式：
 
@@ -267,13 +290,13 @@ WORKER_CONFIG = {
 備援模式: 應用 → 直接呼叫 API/TG
 ```
 
-#### 8.2. 備援模式觸發條件
+#### 7.2. 備援模式觸發條件
 
 1. 初始化時 MQ 連線失敗
 2. 發送訊息時 MQ 斷線
 3. Channel 創建失敗
 
-#### 8.3. 備援模式行為
+#### 7.3. 備援模式行為
 
 ```python
 # LogBeacon 備援
@@ -287,7 +310,7 @@ if not mq_connected:
     success = await self._send_telegram_directly(token, chat_id, message)
 ```
 
-#### 8.4. 自動重連機制
+#### 7.4. 自動重連機制
 
 系統有背景重連監控任務：
 
@@ -315,7 +338,7 @@ async def _reconnect_monitor(self):
 * 全部失敗後等待 30 秒再重新開始
 * 重連成功後自動恢復正常模式
 
-#### 8.5. 優雅關閉
+#### 7.5. 優雅關閉
 
 ```python
 # 應用關閉時
@@ -328,7 +351,7 @@ await log_system.close()
 # 4. 關閉 MQ 連線
 ```
 
-### 9. 常見問題
+### 8. 常見問題
 
 #### Q1: 如何確認日誌系統是否正常運作?
 
@@ -457,9 +480,9 @@ if __name__ == "__main__":
     asyncio.run(test_log_system())
 ```
 
-### 10. 進階使用
+### 9. 進階使用
 
-#### 10.1. 自訂日誌格式
+#### 9.1. 自訂日誌格式
 
 如果需要自訂日誌格式，可以繼承 `LogSystem` 類：
 
@@ -473,7 +496,7 @@ class CustomLogSystem(LogSystem):
         return f"[{timestamp}] [{self.config.LEVEL_MAP[level]}] {def_name} | {message} | {extra_info}"
 ```
 
-#### 10.2. 擴展發送目標
+#### 9.2. 擴展發送目標
 
 可以覆寫 `log()` 方法來增加其他發送目標：
 
@@ -488,7 +511,7 @@ class ExtendedLogSystem(LogSystem):
             await self.send_to_monitoring_system(message, extra_info)
 ```
 
-### 11. 總結
+### 總結
 
 這個日誌系統提供了：
 
