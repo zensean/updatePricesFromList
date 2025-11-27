@@ -542,10 +542,10 @@ DEV_TG_CHATID = ""
 4. 將 `<YOUR_BOT_TOKEN>` 替換為你的 Bot Token
 5. 執行後會看到 JSON 回應，找到以下內容：
 ```json
-"chat"： {
-  "id"： -1002017182237，
-  "title"： "..."，
-  "type"： "supergroup"
+"chat": {
+  "id": -1002017182237,
+  "title": "...",
+  "type": "supergroup"
 }
 ```
 
@@ -725,10 +725,10 @@ DOMAIN_NAME = ""
 **LOG_MQ_CONFIG**
 ```python
 LOG_MQ_CONFIG = {
-    "host"： MALLMQHOST，
-    "port"： MALLMQPORT，
-    "login"： MALLMQUSER，
-    "password"： MALLMQPASS，
+    "host": MALLMQHOST,
+    "port": MALLMQPORT,
+    "login": MALLMQUSER,
+    "password": MALLMQPASS,
 }
 ```
 
@@ -737,12 +737,12 @@ LOG_MQ_CONFIG = {
 **LEVEL_MAP**
 ```python
 LEVEL_MAP = {
-    0： "Debug"，
-    1： "Info"，
-    9： "Error"，
-    11： "Info_CTG"，
-    91： "Error_CTG"，
-    99： "Monitor"，
+    0: "Debug",
+    1: "Info",
+    9: "Error",
+    11: "Info_CTG",
+    91: "Error_CTG",
+    99: "Monitor",
 }
 ```
 
@@ -757,10 +757,10 @@ LOGBEACON_URL = ""
 
 **get_queue_names()**
 ```python
-def get_queue_names(domain： str)：
+def get_queue_names(domain: str):
     return {
-        "logbeacon"： f"{domain}_logbeacon"，
-        "telegram"： f"{domain}_tg"
+        "logbeacon": f"{domain}_logbeacon"，
+        "telegram": f"{domain}_tg"
     }
 ```
 
@@ -876,26 +876,26 @@ API 啟動
 LogBeacon 佇列訊息：
 ```json
 {
-  "domain"： "example.com"，
-  "program_name"： "api_server"，
-  "level"： "Error"，
-  "def_name"： "process_order"，
-  "message"： "訂單處理失敗"，
-  "extra_info"： "訂單編號： 12345"，
-  "timestamp"： "2025-11-26 10：30：00"，
-  "hash"： "abc123"
+  "domain": "example.com",
+  "program_name": "api_server",
+  "level": "Error",
+  "def_name": "process_order",
+  "message": "訂單處理失敗",
+  "extra_info": "訂單編號： 12345",
+  "timestamp": "2025-11-26 10：30：00",
+  "hash": "abc123"
 }
 ```
 
 Telegram 佇列訊息：
 ```json
 {
-  "tg_token"： "1234567890：ABC..."，
-  "tg_chatid"： "-1002017182237"，
-  "notify_msg"： "錯誤時間：2025-11-26 10：30：00 ..."，
-  "type"： "developer"，
-  "timestamp"： "2025-11-26 10：30：00"，
-  "hash"： "abc123"
+   "tg_token": "1234567890：ABC...",
+  "tg_chatid": "-1002017182237",
+  "notify_msg": "錯誤時間：2025-11-26 10：30：00 ...",
+  "type": "developer",
+  "timestamp": "2025-11-26 10：30：00",
+  "hash": "abc123"
 }
 ```
 
@@ -1073,7 +1073,7 @@ python send_tg.py
 if data.strip().lower() == "ping"：
     last_ping_time = datetime.datetime.utcnow()
     await websocket.send_text("pong")
-    await logsys(0， "s2u_websocket_endpoint"， f"收到 ping，回 pong 給 {user_id}"， "")
+    await logsys(0, "s2u_websocket_endpoint", f"收到 ping，回 pong 給 {user_id}", "")
 ```
 
 **這會發生什麼：**
@@ -1091,7 +1091,7 @@ if data.strip().lower() == "ping"：
 # 查詢成功，返回通知列表
 formatted_notifications = [...]  # 格式化通知資料
 
-await logsys(1， def_name， f"返回 {len(formatted_notifications)} 條通知給 {db_user_id}"， "")
+await logsys(1, def_name, f"返回 {len(formatted_notifications)} 條通知給 {db_user_id}", "")
 return formatted_notifications
 ```
 
@@ -1107,10 +1107,10 @@ return formatted_notifications
 ```python
 # 廣播測試訊息到 Redis
 message_str = json.dumps(payload)
-await redis_conn.publish("s2u_events"， message_str)
+await redis_conn.publish("s2u_events", message_str)
 
-log_msg = f"已發布測試訊息至頻道 's2u_events' 給 user_id： {data.user_id}"
-await logsys(1， def_name， log_msg， data.message)
+log_msg = f"已發布測試訊息至頻道 's2u_events' 給 user_id: {data.user_id}"
+await logsys(1, def_name, log_msg, data.message)
 ```
 
 **用途：** 記錄系統操作，確認訊息已成功發布。
@@ -1119,13 +1119,13 @@ await logsys(1， def_name， log_msg， data.message)
 
 **情境：** 資料庫查詢失敗時記錄錯誤
 ```python
-try：
+try:
     # 查詢或更新補償事件
-    notifications， conn， cur = await mysql_exec(...)
-except Exception as e：
+    notifications, conn, cur = await mysql_exec(...)
+except Exception as e:
     traceback.print_exc()
-    await logsys(9， def_name， "查詢或更新補償事件失敗"， str(e))
-    return JSONResponse(status_code=500， content={"error"： str(e)})
+    await logsys(9, def_name, "查詢或更新補償事件失敗", str(e))
+    return JSONResponse(status_code=500, content={"error", str(e)})
 ```
 
 **這會發生什麼：**
@@ -1140,19 +1140,19 @@ except Exception as e：
 **另一個範例：** WebSocket 心跳超時
 ```python
 # 檢查心跳是否超時
-if (now - last_ping_time).total_seconds() > 120：  # 超過 2 分鐘沒 ping
-    await logsys(9， "s2u_websocket_endpoint"， f"用戶 {user_id} 心跳超時，自動斷線"， "")
-    await websocket.close(code=4000， reason="Heartbeat timeout")
+if (now - last_ping_time).total_seconds() > 120:  # 超過 2 分鐘沒 ping
+    await logsys(9, "s2u_websocket_endpoint", f"用戶 {user_id} 心跳超時，自動斷線", "")
+    await websocket.close(code=4000, reason="Heartbeat timeout")
 ```
 
 **用途：** 記錄異常連線狀況，提醒開發者注意。
 
 **廣播測試失敗範例：**
 ```python
-except Exception as e：
-    error_message = f"廣播測試失敗： {str(e)}"
-    await logsys(9， "broadcast_test"， error_message， "")
-    return JSONResponse(status_code=500， content={"error"： error_message})
+except Exception as e:
+    error_message = f"廣播測試失敗: {str(e)}"
+    await logsys(9, "broadcast_test", error_message, "")
+    return JSONResponse(status_code=500, content={"error": error_message})
 ```
 
 **用途：** 捕捉未預期的錯誤，確保開發者能及時發現問題。
@@ -1162,13 +1162,13 @@ except Exception as e：
 **情境：** 用戶提供了無效的 user_id 格式
 ```python
 # 驗證 user_id 格式
-if isinstance(user_id， str) and user_id.startswith("user_from_")：
-    db_user_id = int(user_id.replace("user_from_"， ""))
-elif isinstance(user_id， int)：
+if isinstance(user_id, str) and user_id.startswith("user_from_"):
+    db_user_id = int(user_id.replace("user_from_", ""))
+elif isinstance(user_id, int):
     db_user_id = user_id
-else：
-    await logsys(9， def_name， "無效的 user_id 格式"， str(user_id))
-    return JSONResponse(status_code=400， content={"error"： "Invalid user_id format"})
+else:
+    await logsys(9, def_name, "無效的 user_id 格式", str(user_id))
+    return JSONResponse(status_code=400, content={"error": "Invalid user_id format"})
 ```
 
 **這會發生什麼：**
@@ -1188,9 +1188,9 @@ else：
 logsys() 函數接收四個參數：
 ```python
 await logsys(
-    level，        # int： 日誌級別 (0， 1， 9， 11， 91， 99)
-    def_name，     # str： 函數或方法名稱 (建議使用 __name__ 或手動指定)
-    message，      # str： 主要訊息內容
+    level,        # int： 日誌級別 (0， 1， 9， 11， 91， 99)
+    def_name,     # str： 函數或方法名稱 (建議使用 __name__ 或手動指定)
+    message,      # str： 主要訊息內容
     extra_info    # Any： 額外資訊 (可以是字串、字典、列表等)
 )
 ```
@@ -1201,65 +1201,65 @@ await logsys(
 ```python
 # ✅ 好的做法
 def_name = "get_user_notifications"
-await logsys(1， def_name， "查詢成功"， "")
+await logsys(1, def_name, "查詢成功", "")
 
 # ❌ 不好的做法
-await logsys(1， "func"， "成功"， "")  # 不知道是哪個函數
+await logsys(1, "func", "成功", "")  # 不知道是哪個函數
 ```
 
 2. **message 要簡潔明瞭**
 ```python
 # ✅ 好的做法
-await logsys(9， def_name， "資料庫連線失敗"， str(e))
+await logsys(9, def_name, "資料庫連線失敗", str(e))
 
 # ❌ 不好的做法
-await logsys(9， def_name， "發生了一個錯誤"， "")  # 不夠具體
+await logsys(9, def_name, "發生了一個錯誤", "")  # 不夠具體
 ```
 
 3. **extra_info 提供詳細資訊**
 ```python
 # ✅ 好的做法 - 提供上下文
-await logsys(9， def_name， "訂單處理失敗"， {"order_id"： 123， "user_id"： 456})
+await logsys(9, def_name, "訂單處理失敗", {"order_id": 123, "user_id": 456})
 
 # ✅ 也可以 - 使用異常訊息
-except Exception as e：
-    await logsys(9， def_name， "未預期的錯誤"， str(e))
+except Exception as e:
+    await logsys(9, def_name, "未預期的錯誤", str(e))
 ```
 
 4. **選擇適當的 level**
 ```python
 # ✅ 開發時追蹤
-await logsys(0， def_name， "進入函數"， f"參數： {params}")
+await logsys(0, def_name, "進入函數", f"參數: {params}")
 
 # ✅ 正常操作記錄
-await logsys(1， def_name， "用戶登入成功"， user_id)
+await logsys(1, def_name, "用戶登入成功", user_id)
 
 # ✅ 錯誤需要處理
-await logsys(9， def_name， "支付失敗"， error_message)
+await logsys(9, def_name, "支付失敗", error_message)
 ```
 
 #### 常見模式
 
 **在 try-except 中使用：**
 ```python
-try：
+try:
     result = await some_operation()
-    await logsys(1， def_name， "操作成功"， result)
-except Exception as e：
+    await logsys(1, def_name, "操作成功", result)
+except Exception as e:
     traceback.print_exc()  # 在終端顯示完整錯誤堆疊
-    await logsys(9， def_name， "操作失敗"， str(e))
+    await logsys(9, def_name, "操作失敗", str(e))
     raise  # 或返回錯誤回應
 ```
 
 **在函數入口記錄：**
 ```python
-async def process_order(order_id： int)：
+async def process_order(order_id: int):
     def_name = "process_order"
-    await logsys(0， def_name， f"開始處理訂單 {order_id}"， "")
+    await logsys(0, def_name, f"開始處理訂單 {order_id}", "")
     
     # ... 處理邏輯
     
-    await logsys(1， def_name， f"訂單 {order_id} 處理完成"， "")
+    await logsys(1, def_name, f"訂單 {order_id} 處理完成", "")
 ```
 
 ### 第 4 章總結
@@ -1294,15 +1294,15 @@ async def process_order(order_id： int)：
 **使用 uvicorn 啟動 API：**
 ```bash
 # 開發模式 (單一 worker，支援熱重載)
-uvicorn example_api：app --host 0.0.0.0 --port 8866 --reload
+uvicorn example_api:app --host 0.0.0.0 --port 8866 --reload
 
 # 生產模式 (多個 workers)
-uvicorn example_api：app --host 0.0.0.0 --port 8866 --workers 4
+uvicorn example_api:app --host 0.0.0.0 --port 8866 --workers 4
 ```
 
 **參數說明：**
 
-* `example_api：app`：模組名稱和 FastAPI 應用程式物件
+* `example_api:app`：模組名稱和 FastAPI 應用程式物件
 * `--host 0.0.0.0`：監聽所有網路介面
 * `--port 8866`：API 監聽的端口
 * `--reload`：檔案變更時自動重載 (僅開發用)
@@ -1360,7 +1360,7 @@ uvicorn example_api：app --host 0.0.0.0 --port 8866 --workers 4
 開始監聽 HTTP 請求
     ↓
 輸出啟動成功日誌：
-await logsys(1， PROGRAM_NAME， "程式啟動成功"， "")
+await logsys(1, PROGRAM_NAME, "程式啟動成功", "")
 ```
 
 #### LogSystem 的生命週期
