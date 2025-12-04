@@ -2,6 +2,7 @@
 本文件旨在詳細介紹日誌(LOG)系統的設計理念、架構演進、核心組件功能以及實際操作指南。文件內容涵蓋從舊版單體架構到新版基於 RabbitMQ 的微服務架構的轉變，並提供開發者完整的程式碼範例與運行說明，幫助團隊快速理解系統運作原理，確保生產環境的高可靠性與監控能力。
 
 #### **修訂歷史**
+* **v1.4 (2025-12-04)**： 修正不適當的比喻，整合參數段落，修正Telegram 配置說明，刪除附錄及文句部分微調。
 * **v1.3 (2025-12-01)**： 提取新日誌系統部分單獨介紹，移除圖表改用文字表示並再次修正格式。
 * **v1.2 (2025-11-27)**： 全面優化文件格式與排版，統一結構標準，提升可讀性與專業度。
 * **v1.1 (2025-11-19)**： 大改版，優化文件結構，更符合技術文檔需求，整合系統概述、架構圖、核心組件、程式碼範例與運行說明。
@@ -11,8 +12,8 @@
 
 # **日誌系統技術文件**
 
-**版本：1.3 (2025-12-01)**  
-**最後更新：2025-12-01**
+**版本：1.3 (2025-12-04)**  
+**最後更新：2025-12-04**
 
 ### 1. 系統概述
 
@@ -67,24 +68,25 @@ LOG 系統採用**生產者-消費者模式**，這是一種常見的架構模�
 
 * **什麼是生產者-消費者模式?**
 
-    * 用餐廳點餐來比喻：
+    * 用郵局比喻：
 ```
-顧客點餐(生產者)
+寄信人寫信 (生產者)
     ↓
-菜單寫在單子上(訊息)
+信件/包裹 (訊息)
     ↓
-單子夾在廚房的夾子上(佇列)
+郵筒或集貨籃 (佇列/Queue)
     ↓
-廚師看到單子開始做菜(消費者)
+郵務人員分類與投遞 (消費者)
     ↓
-完成後送給顧客(目標)
+送達收件人手中 (目標)
 ```
 
 * **關鍵點：**
 
-    * 顧客點完餐就可以去坐了，不用等廚師做完(非阻塞)
-    * 單子會一直夾在那裡，不會弄丟(持久化)
-    * 可以有多個廚師同時做菜(可擴展)
+    * 發送訊息的程式不用等待處理結果，可以繼續執行下一行程式碼(非阻塞)
+    * 佇列確保資料在被處理前是安全的，能應對突發流量(持久化)
+    * 當資料量變大時，可以輕易增加處理程式的數量來加快速度(可擴展)
+    * 生產資料的系統與處理資料的系統互不影響，降低系統複雜度(解耦)
 
 #### 1.6. 在日誌系統中的三個角色
 
@@ -105,10 +107,10 @@ LOG 系統採用**生產者-消費者模式**，這是一種常見的架構模�
 ```python
 # API 處理訂單時發生錯誤
 await logsys.log(
-    level=9，                    # 錯誤級別
-    def_name="process_order"，   # 哪個函數
-    message="訂單處理失敗"，      # 錯誤訊息
-    extra_info={"order_id"： 123}  # 額外資訊
+    level=9,                    # 錯誤級別
+    def_name="process_order",   # 哪個函數
+    message="訂單處理失敗",      # 錯誤訊息
+    extra_info={"order_id": 123}  # 額外資訊
 )
 # 呼叫後立即返回，不會等待發送完成
 ```
@@ -118,7 +120,7 @@ await logsys.log(
 * **是什麼：**
 
     * 暫存訊息的地方
-    * 就像餐廳廚房的單子夾
+    * 就像郵筒或集貨籃
 
 * **做什麼：**
 
@@ -136,7 +138,7 @@ await logsys.log(
 * **是什麼：**
 
     * 處理訊息的程式
-    * 就像餐廳的廚師
+    * 就像郵務人員分類與投遞
 
 * **做什麼：**
 
@@ -190,8 +192,8 @@ USE_NEW_LOGSYS = True   # True： 使用新版，False： 使用舊版
 #### 2.1. 組件配置：
 
 * **API 主程序 (生產者)**
-    * FastAPI Application：API 主程式
-    * LogSysMQ：日誌系統核心類別
+    * example_api.py：API 主程式
+    * logsys_mq：日誌系統核心類別
 
 * **RabbitMQ (訊息佇列)**
     * `logbeacon` 佇列：存放 LogBeacon 日誌
@@ -220,7 +222,7 @@ USE_NEW_LOGSYS = True   # True： 使用新版，False： 使用舊版
     ↓
 FastAPI 處理請求時需要記錄日誌
     ↓
-呼叫 logsys.log(level， def_name， message， extra_info)
+呼叫 logsys.log(level, def_name, message, extra_info)
     ↓
 步驟 2： 決定目標佇列
     ↓
@@ -242,20 +244,19 @@ API 返回(非阻塞)
 步驟 4： Workers 消費訊息
     ↓
 send_logbeacon.py 監聽 logbeacon 佇列
-  ↓
-  從佇列取出訊息
-  ↓
-  HTTP POST 到 LogBeacon API
-  ↓
+    ↓
+從佇列取出訊息
+    ↓
+HTTP POST 到 LogBeacon API
+    ↓
   成功：ACK(確認訊息)
-  失敗：NACK(拒絕訊息)
-    
+  失敗：NACK(拒絕訊息)   
 send_tg.py 監聽 tg 佇列
-  ↓
-  從佇列取出訊息
-  ↓
-  HTTP POST 到 Telegram Bot API
-  ↓
+    ↓
+從佇列取出訊息
+    ↓
+HTTP POST 到 Telegram Bot API
+    ↓
   成功：ACK
   失敗：NACK
     ↓
@@ -292,217 +293,106 @@ LogSysMQ 偵測到連線失敗
 
 這確保了即使 RabbitMQ 暫時離線，重要的錯誤日誌和通知仍然能夠送達。
 
+### 3. 系統環境配置
 
-### 3. 核心組件說明
-
-本章目的：介紹所有系統配置，包含資料庫、MQ、Telegram、日誌級別等設定。
+本章目的：介紹系統運作所需的所有環境變數與參數配置。
 
 #### 3.1. Telegram 配置
 
-說明：以下是有關於 Telegram 相關的配置
-
-#### 3.1.1. DEV_TG_CHATID
-
-說明：開發者 Telegram 群組的 Chat ID
+說明：以下是有關於 Telegram 相關的配置。
 
 ```python
 DEV_TG_CHATID = ""
+DEV_TG_TOKEN = ""
 ```
+
+#### 3.1.1. DEV_TG_CHATID
+
+說明：開發者 Telegram 群組的 Chat ID。
 
 * **取得方式：**
 
     * 建立 Telegram 聊天室，將你的帳號和 Bot 加入同一個房間
-    * 使用你的帳號在聊天室中傳送任意訊息
-    * 使用瀏覽器開啟 `https：//api.telegram.org/bot<YOUR_BOT_TOKEN>/getUpdates`
-    * 將 `<YOUR_BOT_TOKEN>` 替換為你的 Bot Token
-    * 執行後會看到 JSON 回應，找到以下內容：
-
-```json
-"chat": {
-  "id" : -1002017182237,
-  "title" : "...",
-  "type" : "supergroup"
-}
-```
-其中的 `id` 就是所需的 Chat ID (格式為 -100xxxxxxx)
+    * 使用電腦瀏覽器登入 [Telegram Web](https://web.telegram.org/)
+    * 點擊進入該群組，查看瀏覽器網址列 # 符號後面的數字
+    * 填入規則：
+        * 若網址顯示為負數 (如 -506...)：直接複製使用 (普通群組)
+        * 若網址顯示為正數：請在前方加上 -100 (超級群組)
 
 #### 3.1.2. DEV_TG_TOKEN
 
-說明：開發者 Telegram Bot 的 API Token
-
-```python
-DEV_TG_TOKEN = ""
-```
+說明：開發者 Telegram Bot 的 API Token。
 
 * **取得方式：**
 
-    * 開啟 Telegram 並搜尋 `@BotFather`
-    * 輸入 `/mybot` 指令
+    * 開啟 Telegram 並搜尋 @BotFather
+    * 輸入指令 /newbot 創建一個新的Bot 或者 /mybot 選擇你擁有的Bot
     * 選擇你要使用的 Bot
-    * 點選 `API Token` 選項
+    * 點選 API Token 選項
     * 複製顯示的 Token
 
 #### 3.2. MySQL 連接池配置
 
-說明：以下是有關於 MySQL 連接池相關的配置
-
-#### 3.2.1. MYSQL_DB
-
-說明：MySQL 資料庫名稱
+說明：以下是有關於 MySQL 連接池相關的配置。
 
 ```python
 MYSQL_DB = ""
-```
-
-設定方式：請參照 STK 測試環境資料中的 MySQL 資料庫配置，並登入 phpMyAdmin 管理介面確認左側列表中是否存在對應的資料庫名稱
-
-#### 3.2.2. MYSQL_HOST
-
-說明：MySQL 資料庫主機位址
-
-```python
 MYSQL_HOST = ""
-```
-
-設定方式：請參照 STK 測試環境資料中的 MySQL 資料庫外網連線 (透過 SSH 端口轉發) 的主機位址
-
-#### 3.2.3. MYSQL_USER
-
-說明：MySQL 資料庫使用者名稱
-
-```python
 MYSQL_USER = ""
-```
-
-設定方式：請參照 STK 測試環境資料中的 MySQL 通用帳號
-
-#### 3.2.4. MYSQL_PASSWD
-
-說明：MySQL 資料庫密碼
-
-```python
 MYSQL_PASSWD = ""
-```
-
-設定方式：請參照 STK 測試環境資料中的 MySQL 通用密碼
-
-#### 3.2.5. MYSQL_PORT
-
-說明：MySQL 資料庫端口
-
-```python
 MYSQL_PORT = 0000
 ```
 
-設定方式：請參照 STK 測試環境資料中的 MySQL 個人外部連接端口
+   * 設定方式： 請參照 STK 測試環境資料 中的 MySQL 配置填入對應欄位
+
+       * MYSQL_DB：資料庫名稱 (請登入 phpMyAdmin 確認左側列表中的名稱)
+       * MYSQL_HOST：主機位址 (請使用 外網連線 (透過 SSH 端口轉發))
+       * MYSQL_USER / MYSQL_PASSWD：請填入 MySQL 通用帳號與密碼
+       * MYSQL_PORT：資料庫端口 (請填寫您分配到的 個人外部連接端口)
 
 #### 3.3. Redis 配置
 
-說明：以下是有關於 Redis 相關的配置
-
-#### 3.3.1. REDIS_HOST
-
-說明：Redis 伺服器主機位址
+說明：以下是有關於 Redis 相關的配置。
 
 ```python
 REDIS_HOST = ""
-```
-
-設定方式：請參照 STK 測試環境資料中的 Redis 快取外網連線 (透過 SSH 端口轉發) 的主機位址
-
-#### 3.3.2. REDIS_PASSWD
-
-說明：Redis 伺服器密碼
-
-```python
 REDIS_PASSWD = ""
-```
-
-設定方式：請參照 STK 測試環境資料中的 Redis 快取通用密碼
-
-#### 3.3.3. REDIS_PORT
-
-說明：Redis 伺服器端口
-
-```python
 REDIS_PORT = 0000
 ```
+   * 設定方式： 請參照 STK 測試環境資料 中的 Redis 配置填入對應欄位
 
-設定方式：請參照 STK 測試環境資料中的 Redis 快取個人外部連接端口
+       * REDIS_HOST：主機位址 (請使用 外網連線 (透過 SSH 端口轉發))
+       * REDIS_PASSWD：請填入 Redis 通用密碼
+       * REDIS_PORT：伺服器端口 (請填寫您分配到的 個人外部連接端口)
 
 #### 3.4. RabbitMQ 配置
 
-說明：以下是有關於RabbitMQ 相關的配置
-
-#### 3.4.1. MALLMQUSER
-
-說明：RabbitMQ 使用者名稱
+說明：以下是有關於RabbitMQ 相關的配置。
 
 ```python
+# 服務連線設定
 MALLMQUSER = ""
-```
-
-設定方式：請參照 STK 測試環境資料中的 RabbitMQ 管理介面 (Web UI) 帳號
-
-#### 3.4.2. MALLMQPASS
-
-說明：RabbitMQ 密碼
-
-```python
 MALLMQPASS = ""
-```
-
-設定方式：請參照 STK 測試環境資料中的 RabbitMQ 管理介面 (Web UI) 密碼
-
-#### 3.4.3. MALLMQHOST
-
-說明：RabbitMQ 主機位址
-
-```python
 MALLMQHOST = ""
-```
-
-設定方式：請參照 STK 測試環境資料中的 RabbitMQ 外網連線 (透過 SSH 端口轉發) 的主機位址
-
-#### 3.4.4. MALLMQPORT
-
-說明：RabbitMQ 端口
-
-```python
 MALLMQPORT = 0
-```
 
-設定方式：請參照 STK 測試環境資料中的 RabbitMQ 外網連線 (透過 SSH 端口轉發) 的個人外部連接端口
-
-#### 3.4.5. APIMQPROTO
-
-說明：RabbitMQ 管理介面協定
-
-```python
+# 管理介面 (Web UI/API) 設定
 APIMQPROTO = "https"
-```
-
-#### 3.4.6. APIMQHOST
-
-說明：RabbitMQ 管理介面主機位址
-
-```python
 APIMQHOST = ""
-```
-
-設定方式：請參照 STK 測試環境資料中的 RabbitMQ 管理介面 (Web UI) 網址
-
-#### 3.4.7. APIMQPORT
-
-說明：RabbitMQ 管理介面端口
-
-```python
 APIMQPORT = 443
 ```
 
+   * 設定方式： 請參照 STK 測試環境資料 中的 RabbitMQ 配置填入對應欄位
+
+       * MALLMQUSER / MALLMQPASS：請填入 RabbitMQ 管理介面 (Web UI) 的帳號與密碼
+       * MALLMQHOST：主機位址 (請使用 外網連線 (透過 SSH 端口轉發))
+       * MALLMQPORT：服務端口 (請填寫您分配到的 個人外部連接端口)
+       * APIMQHOST：管理介面主機位址 (請參照 Web UI 網址)
+       * APIMQPROTO / APIMQPORT：管理介面協定與端口 (預設分別為 "https" 與 443)
+
 #### 3.5. 日誌系統配置
 
-說明：日誌系統版本切換開關
+說明：日誌系統版本切換開關。
 
 ```python
 USE_NEW_LOGSYS = True
@@ -512,28 +402,17 @@ USE_NEW_LOGSYS = True
 
 #### 3.6. DOMAIN_NAME
 
-說明：服務域名，用於區分不同服務的日誌佇列
+說明：服務域名，用於區分不同服務的日誌佇列。
 
 ```python
 DOMAIN_NAME = ""
 ```
 
-#### 3.7. get_queue_names()
+### 4. 日誌系統架構詳解
 
-說明：根據域名產生對應的 RabbitMQ 佇列名稱
+本章目的：說明日誌系統的運作原理、組件互動方式與佇列設計。
 
-```python
-def get_queue_names(domain: str):
-    return {
-        "logbeacon": f"{domain}_logbeacon"，
-        "telegram": f"{domain}_tg"
-    }
-```
-
-   * LogBeacon 佇列格式：`{domain}_logbeacon`
-   * Telegram 佇列格式：`{domain}_tg`
-
-#### 3.8. 新版日誌系統 (解構版)
+#### 4.1. 架構概覽
 
 說明：將日誌系統解構成獨立組件，使用 RabbitMQ 作為訊息佇列，提升可靠性和擴展性。
 
@@ -545,39 +424,28 @@ def get_queue_names(domain: str):
 | **send_logbeacon.py** | 消費者 | 消費 logbeacon 佇列，發送到 LogBeacon 伺服器 |
 | **send_tg.py** | 消費者 | 消費 telegram 佇列，發送到 Telegram Bot |
 
-#### 3.8.1. logsys_mq.py (生產者)
+#### 4.2. logsys_mq.py (生產者)
 
 說明：LogSystem 類別負責產生日誌並推送到 RabbitMQ，是新版日誌系統的核心生產者。
 
 * **主要功能：**
 
-#### 3.8.1.1. 初始化連線
+#### 4.2.1. 初始化連線
    * 建立 RabbitMQ 連線 (使用 aio_pika)
    * 宣告兩個佇列：`{domain}_logbeacon` 和 `{domain}_tg`
    * 連線失敗時啟用備援模式
 
-#### 3.8.1.2. 接收日誌
+#### 4.2.2. 接收日誌
    * 提供 `log()` 方法接收日誌參數
    * 根據 level 決定發送到哪些佇列
    * 包裝成對應格式的訊息
 
-#### 3.8.1.3. 發送到 MQ
+#### 4.2.3. 發送到 MQ
    * 將訊息序列化成 JSON
    * 發送到對應的 RabbitMQ 佇列
    * 訊息設定為持久化 (durable)
 
-* **日誌分發規則：**
-
-| Level | 名稱 | 本地輸出 | LogBeacon | 開發者 TG | 客戶 TG |
-|-------|------|---------|-----------|----------|---------|
-| 0 | Debug | ✅ | ❌ | ❌ | ❌ |
-| 1 | Info | ✅ | ✅ | ❌ | ❌ |
-| 9 | Error | ✅ | ✅ | ✅ | ❌ |
-| 11 | Info_CTG | ✅ | ✅ | ❌ | ✅ |
-| 91 | Error_CTG | ✅ | ✅ | ✅ | ✅ |
-| 99 | Monitor | ✅ | ❌ | ❌ | ❌ |
-
-#### 3.8.1.4. 訊息格式範例
+#### 4.2.4. 訊息格式範例
 
 * **LogBeacon 佇列訊息**
 ```json
@@ -611,7 +479,7 @@ def get_queue_names(domain: str):
     * **備援模式**：MQ 無法連線時，自動切換為直接呼叫目標 API
     * **優雅關閉**：確保所有進行中的發送任務完成後才關閉
 
-#### 3.8.2. send_logbeacon.py (LogBeacon 消費者)
+#### 4.3. send_logbeacon.py (LogBeacon 消費者)
 
 說明：獨立運行的 Worker 程式，專門消費 `{domain}_logbeacon` 佇列，將日誌發送到 LogBeacon 伺服器。
 
@@ -642,7 +510,7 @@ def get_queue_names(domain: str):
 python send_logbeacon.py
 ```
 
-#### 3.8.3. send_tg.py (Telegram 消費者)
+#### 4.4. send_tg.py (Telegram 消費者)
 
 說明：獨立運行的 Worker 程式，專門消費 `{domain}_tg` 佇列，將通知發送到 Telegram。
 
@@ -676,15 +544,15 @@ python send_logbeacon.py
 python send_tg.py
 ```
 
-#### 3.8.4. RabbitMQ (訊息佇列)
+#### 4.5. RabbitMQ (訊息佇列)
 
 說明：獨立運行的訊息佇列服務，負責暫存和分發日誌訊息，共有兩個佇列。
 
-#### 3.8.4.1. `{domain}_logbeacon` 佇列
+#### 4.5.1. `{domain}_logbeacon` 佇列
    * 用途：存放要發送到 LogBeacon 伺服器的日誌
    * 消費者：send_logbeacon.py
 
-#### 3.8.4.2. `{domain}_tg` 佇列
+#### 4.5.2. `{domain}_tg` 佇列
    * 用途：存放要發送到 Telegram 的通知
    * 消費者：send_tg.py
 
@@ -704,15 +572,15 @@ python send_tg.py
     * **可擴展性**：可以啟動多個 Workers 平行處理同一個佇列
     * **可靠性**：透過 ACK/NACK 機制確保訊息不會遺失
 
-### 4. 程式碼範例解析
+### 5. 程式碼範例解析
 
 本章目的：透過 example_api.py 中的真實範例，說明如何在程式中使用日誌系統。
 
-#### 4.1. 日誌級別說明 (LEVEL_MAP)
+#### 5.1. 日誌級別說明 (LEVEL_MAP)
 
 說明：系統提供六種日誌級別，對應不同的使用場景和通知方式。
 
-#### 4.1.1. 日誌級別對照表
+#### 5.1.1. 日誌級別對照表
 
 | Level | 名稱 | 用途 | 終端輸出 | LogBeacon | 開發者 TG | 客戶 TG | 使用時機 |
 |-------|------|------|---------|-----------|----------|---------|----------|
@@ -723,7 +591,7 @@ python send_tg.py
 | **91** | Error_CTG | 客戶錯誤 | ✅ | ✅ | ✅ | ✅ | 需要同時通知開發者和客戶的錯誤 |
 | **99** | Monitor | 監控訊息 | ✅ | ❌ | ❌ | ❌ | 系統監控、效能追蹤等特殊用途 |
 
-#### 4.1.2. 使用原則
+#### 5.1.2. 使用原則
 
    * **Level 0 (Debug)**：開發時使用，追蹤細節，不發送到外部
    * **Level 1 (Info)**：生產環境記錄正常操作，發送到 LogBeacon 儲存
@@ -731,11 +599,11 @@ python send_tg.py
    * **Level 11/91**：涉及客戶時使用，CTG = Customer Telegram Group
    * **Level 99 (Monitor)**：特殊監控用途，通常用於效能追蹤
 
-#### 4.2. 使用範例
+#### 5.2. 使用範例
 
 說明：從 example_api.py 中截取真實的使用案例，展示不同情境下的日誌記錄方式。
 
-#### 4.2.1. 範例：記錄除錯訊息 (Level 0)
+#### 5.2.1. 範例：記錄除錯訊息 (Level 0)
 
 * **情境：** WebSocket 連線時，記錄心跳檢測訊息
 ```python
@@ -754,7 +622,7 @@ if data.strip().lower() == "ping"：
 
 * **用途：** 開發時追蹤 WebSocket 連線狀態，了解心跳是否正常運作。
 
-#### 4.2.2. 範例：記錄一般操作 (Level 1)
+#### 5.2.2. 範例：記錄一般操作 (Level 1)
 
 * **情境：** 查詢用戶通知列表後，記錄返回結果
 ```python
@@ -773,7 +641,7 @@ return formatted_notifications
 
 * **用途：** 記錄正常的業務操作，方便後續追蹤和分析用戶行為。
 
-#### 4.2.3. 範例：記錄錯誤 (Level 9)
+#### 5.2.3. 範例：記錄錯誤 (Level 9)
 
 * **情境：** 資料庫查詢失敗時記錄錯誤
 ```python
@@ -795,7 +663,7 @@ except Exception as e:
 
 * **用途：** 記錄系統錯誤，並立即通知開發者處理。
 
-#### 4.2.4. 範例：無效輸入 (Level 9)
+#### 5.2.4. 範例：無效輸入 (Level 9)
 
 * **情境：** 用戶提供了無效的 user_id 格式
 ```python
@@ -817,11 +685,11 @@ else:
 
 * **用途：** 追蹤不正常的 API 使用情況，可能是前端錯誤或惡意請求。
 
-#### 4.3. 使用時的注意事項
+#### 5.3. 使用時的注意事項
 
 說明：使用日誌系統時的一些建議和注意事項。
 
-#### 4.3.1. 參數說明
+#### 5.3.1. 參數說明
 
 說明：logsys() 函數接收四個參數。
 ```python
@@ -833,7 +701,7 @@ await logsys(
 )
 ```
 
-#### 4.3.2. 最佳實踐
+#### 5.3.2. 最佳實踐
 
 * **def_name 要清楚**
 ```python
@@ -876,7 +744,7 @@ await logsys(1, def_name, "用戶登入成功", user_id)
 await logsys(9, def_name, "支付失敗", error_message)
 ```
 
-#### 4.3.3. 常見模式
+#### 5.3.3. 常見模式
 
 * **在 try-except 中使用：**
 ```python
@@ -900,11 +768,11 @@ async def process_order(order_id: int):
     await logsys(1, def_name, f"訂單 {order_id} 處理完成", "")
 ```
 
-### 5. 運行說明
+### 6. 運行說明
 
 本章目的：說明如何啟動和運行日誌系統的各個組件。
 
-#### 5.1. 啟動主程序 (API)
+#### 6.1. 啟動主程序 (API)
 
 說明：主程序是整個系統的核心，包含 FastAPI 應用程式和日誌生產者。
 
@@ -927,11 +795,11 @@ uvicorn example_api:app --host 0.0.0.0 --port 8866 --workers 4
     * `--reload`：檔案變更時自動重載 (僅開發用)
     * `--workers 4`：啟動 4 個工作程序 (生產環境)
 
-#### 5.2. 主程序啟動流程
+#### 6.2. 主程序啟動流程
 
 當 API 啟動時，會依序執行以下初始化步驟。
 
-#### 5.2.1. 初始化資料庫連線池
+#### 6.2.1. 初始化資料庫連線池
 ```
 啟動 FastAPI 應用程式
     ↓
@@ -942,7 +810,7 @@ uvicorn example_api:app --host 0.0.0.0 --port 8866 --workers 4
 建立 Redis 連線池
 ```
 
-#### 5.2.2. 初始化日誌系統
+#### 6.2.2. 初始化日誌系統
 ```
 呼叫 init_logsys(PROGRAM_NAME)
     ↓
@@ -959,7 +827,7 @@ uvicorn example_api:app --host 0.0.0.0 --port 8866 --workers 4
     - 斷線時自動重連
 ```
 
-#### 5.2.3. 啟動 API 服務
+#### 6.2.3. 啟動 API 服務
 ```
 註冊所有 API 路由
     ↓
@@ -971,7 +839,7 @@ uvicorn example_api:app --host 0.0.0.0 --port 8866 --workers 4
 await logsys(1, PROGRAM_NAME, "程式啟動成功", "")
 ```
 
-#### 5.3. LogSystem 的生命週期
+#### 6.3. LogSystem 的生命週期
 
 * **初始化階段：**
 
@@ -993,12 +861,12 @@ await logsys(1, PROGRAM_NAME, "程式啟動成功", "")
     * 關閉 RabbitMQ 連線
     * 關閉資料庫連線池
 
-#### 5.4. 預期看到的日誌
+#### 6.4. 預期看到的日誌
 
 * **新版系統啟動成功：**
 ```
-2025-11-26 10：00：00 - [日誌系統] 初始化建立 MQ 連線成功： stktestssh.stkcpu.cc：5673
-2025-11-26 10：00：01 - api名稱 - 程式啟動成功 - 附加信息： 
+20XX-01-01 11：59：59 - [日誌系統] 初始化建立 MQ 連線成功： stktestssh.stkcpu.cc：5673
+20XX-01-01 12：00：00 - api名稱 - 程式啟動成功 - 附加信息： 
 INFO：     Started server process [12345]
 INFO：     Waiting for application startup.
 INFO：     Application startup complete.
@@ -1007,18 +875,18 @@ INFO：     Uvicorn running on http：//0.0.0.0：8866 (Press CTRL+C to quit)
 
 * **新版系統 MQ 連線失敗 (自動備援)：**
 ```
-2025-11-26 10：00：00 - [日誌系統] 初始化建立 MQ 連線失敗： Connection refused，使用備援模式
-2025-11-26 10：00：01 - api名稱 - 程式啟動成功 - 附加信息： 
+20XX-01-01 11：59：59 - [日誌系統] 初始化建立 MQ 連線失敗： Connection refused，使用備援模式
+20XX-01-01 12：00：00 - api名稱 - 程式啟動成功 - 附加信息： 
 INFO：     Application startup complete.
 ```
 
 (系統會繼續運作，但日誌會直接發送到 LogBeacon/Telegram API)
 
-#### 5.5. 啟動 Workers
+#### 6.5. 啟動 Workers
 
 說明：Workers 是新版系統的消費者，負責從 RabbitMQ 取出訊息並發送到目標端點。
 
-#### 5.5.1. LogBeacon Worker
+#### 6.5.1. LogBeacon Worker
 
 說明：LogBeacon Worker的啟動指令、流程與預期結果。
 
@@ -1042,7 +910,7 @@ python send_logbeacon.py
 
 * **預期看到的日誌：**
 ```
-2025-11-26 10：05：00 - 連接到 RabbitMQ： stktestssh.stkcpu.cc：5673
+20XX-01-01 11：59：59 - 連接到 RabbitMQ： stktestssh.stkcpu.cc：5673
 ==================================================
 LogBeacon Worker 已啟動 (服務： example.com)
 ==================================================
@@ -1066,7 +934,7 @@ LogBeacon Worker 已啟動 (服務： example.com)
 [LogBeacon] 已達最大重試次數，放棄發送
 ```
 
-#### 5.5.2. Telegram Worker
+#### 6.5.2. Telegram Worker
 
 說明：Telegram Worker的啟動指令、流程與預期結果。
 
@@ -1090,7 +958,7 @@ python send_tg.py
 
 * **預期看到的日誌：**
 ```
-2025-11-26 10：06：00 - 連接到 RabbitMQ： stktestssh.stkcpu.cc：5673
+20XX-01-01 11：59：59 - 連接到 RabbitMQ： stktestssh.stkcpu.cc：5673
 ==================================================
 Telegram Worker 已啟動 (服務： example.com)
 ==================================================
@@ -1105,7 +973,7 @@ Telegram Worker 已啟動 (服務： example.com)
 ✅ 發送成功 [TG-customer] 系統通知 - example.com： 訂單已確認
 ```
 
-#### 5.6. Workers 運行建議
+#### 6.6. Workers 運行建議
 
 * **開發環境：**
 ```bash
@@ -1131,214 +999,3 @@ nohup python send_tg.py > tg_worker.log 2>&1 &
 tail -f logbeacon_worker.log
 tail -f tg_worker.log
 ```
-
-### 6. 附錄
-
-本章目的：提供名詞解釋和參考資料，幫助讀者深入了解相關技術。
-
-#### 6.1. 名詞解釋
-
-說明：文檔中出現的技術術語和概念解釋。
-
-#### 6.1.1. 架構與模式
-
-* **生產者-消費者模式 (Producer-Consumer Pattern)**
-
-    * 一種常見的並行設計模式
-    * 生產者負責產生資料，消費者負責處理資料
-    * 透過佇列解耦兩者，實現非同步處理
-
-* **解耦 (Decoupling)**
-
-    * 降低系統組件之間的依賴關係
-    * 使各組件可以獨立開發、部署、擴展
-    * 提高系統的靈活性和維護性
-
-* **非阻塞 (Non-blocking)**
-
-    * 操作不會等待結果返回就繼續執行
-    * 提高系統的回應速度和吞吐量
-    * 在日誌系統中，API 放入訊息後立即返回
-
-* **持久化 (Persistence)**
-
-    * 將資料存儲到非揮發性儲存媒體 (如硬碟)
-    * 確保資料在程式重啟後仍然存在
-    * RabbitMQ 的持久化佇列可以避免訊息遺失
-
-#### 6.1.2. 訊息佇列相關
-
-* **RabbitMQ**
-
-    * 開源的訊息佇列中介軟體 (Message Broker)
-    * 實作 AMQP 協定
-    * 提供可靠的訊息傳遞機制
-
-* **佇列 (Queue)**
-
-    * 先進先出 (FIFO) 的資料結構
-    * 暫存訊息，等待消費者處理
-    * 可以設定為持久化或非持久化
-
-* **ACK (Acknowledge)**
-
-    * 訊息確認機制
-    * 消費者告訴佇列「我已經成功處理這個訊息了」
-    * 佇列收到 ACK 後會將訊息移除
-
-* **NACK (Negative Acknowledge)**
-
-    * 訊息拒絕機制
-    * 消費者告訴佇列「我處理失敗了」
-    * 可以選擇是否重新放回佇列 (requeue)
-
-* **prefetch_count**
-
-    * 預取數量設定
-    * 控制消費者一次可以取出多少個未確認的訊息
-    * 設為 1 表示一次只處理一個訊息
-
-* **durable**
-
-    * 持久化標記
-    * 佇列設為 durable=True 表示重啟後不會消失
-    * 訊息也需要設為持久化才能保證不遺失
-
-#### 6.1.3. 非同步程式設計
-
-* **asyncio**
-
-    * Python 的非同步 I/O 框架
-    * 使用 async/await 語法
-    * 適合處理大量 I/O 密集型操作
-
-* **asyncio.Queue**
-
-    * Python asyncio 提供的非同步佇列
-    * 只能在同一個程式內使用
-    * 訊息存在記憶體中
-
-* **async/await**
-
-    * Python 非同步程式設計的關鍵字
-    * async def 定義非同步函數
-    * await 等待非同步操作完成
-
-* **背景任務 (Background Task)**
-
-    * 在主程式背景運行的任務
-    * 不阻塞主程式的執行
-    * 通常用 asyncio.create_task() 建立
-
-#### 6.1.4. 日誌相關
-
-* **LogBeacon**
-
-    * 日誌收集和管理伺服器
-    * 集中儲存各個服務的日誌
-    * 提供查詢和分析功能
-
-* **日誌級別 (Log Level)**
-
-    * 用數字或名稱區分日誌的重要性
-    * 常見級別：Debug、Info、Warning、Error
-    * 本系統使用：0 (Debug)、1 (Info)、9 (Error) 等
-
-* **CTG (Customer Telegram Group)**
-
-    * 客戶 Telegram 群組的縮寫
-    * Level 11 (Info_CTG) 和 91 (Error_CTG) 會發送到客戶群組
-    * 用於通知客戶重要事件
-
-#### 6.1.5. API 相關
-
-* **FastAPI**
-
-    * 現代、高效能的 Python Web 框架
-    * 基於標準 Python 類型提示
-    * 支援非同步操作
-
-* **Uvicorn**
-
-    * ASGI 伺服器
-    * 用於運行 FastAPI 應用程式
-    * 支援多個 workers 和熱重載
-
-* **中間件 (Middleware)**
-
-    * 在請求處理前後執行的程式碼
-    * 常用於認證、CORS、日誌記錄等
-    * 在 FastAPI 中使用裝飾器或類別實作
-
-* **WebSocket**
-
-    * 全雙工通訊協定
-    * 允許伺服器主動推送訊息給客戶端
-    * 適合即時通訊場景
-
-#### 6.2. 參考資料
-
-說明：相關技術的官方文檔和學習資源。
-
-#### 6.2.1. 核心技術文檔
-
-* **RabbitMQ**
-
-    * 官方網站：https：//www.rabbitmq.com/
-    * 官方教學：https：//www.rabbitmq.com/getstarted.html
-    * Python 客戶端 (aio_pika)：https：//aio-pika.readthedocs.io/
-
-* **FastAPI**
-
-    * 官方文檔：https：//fastapi.tiangolo.com/
-    * 中文文檔：https：//fastapi.tiangolo.com/zh/
-    * GitHub：https：//github.com/tiangolo/fastapi
-
-* **Uvicorn**
-
-    * 官方文檔：https：//www.uvicorn.org/
-    * GitHub：https：//github.com/encode/uvicorn
-
-* **Python asyncio**
-
-    * 官方文檔：https：//docs.python.org/zh-tw/3/library/asyncio.html
-    * asyncio 教學：https：//realpython.com/async-io-python/
-
-#### 6.2.2. Python 套件
-
-* **aiohttp**
-
-    * 非同步 HTTP 客戶端/伺服器框架
-    * 文檔：https：//docs.aiohttp.org/
-
-* **asyncmy**
-
-    * MySQL 非同步驅動
-    * GitHub：https：//github.com/long2ice/asyncmy
-
-* **redis-py**
-
-    * Redis Python 客戶端
-    * 文檔：https：//redis-py.readthedocs.io/
-
-* **colorama**
-
-    * 終端彩色輸出套件
-    * GitHub：https：//github.com/tartley/colorama
-
-#### 6.2.3. 相關概念
-
-* **生產者-消費者模式**
-
-    * 維基百科：https：//en.wikipedia.org/wiki/Producer%E2%80%93consumer_problem
-    * 設計模式介紹：https：//refactoring.guru/design-patterns
-
-* **訊息佇列 (Message Queue)**
-
-    * 概念介紹：https：//aws.amazon.com/message-queue/
-    * 使用場景：https：//www.cloudamqp.com/blog/what-is-message-queuing.html
-
-* **非同步程式設計**
-
-    * Python asyncio 完整指南：https：//realpython.com/async-io-python/
-    * async/await 教學：https：//blog.techbridge.cc/2020/06/20/javascript-async-sync-and-callback/
